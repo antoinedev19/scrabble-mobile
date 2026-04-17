@@ -1,4 +1,3 @@
-// @ts-expect-error — no types for this package
 import frenchWords from 'an-array-of-french-words'
 
 // Mots valides en 2 lettres ODS (non tous présents dans le package)
