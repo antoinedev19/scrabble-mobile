@@ -13,10 +13,13 @@ export interface AIMove {
 
 type Direction = 'H' | 'V'
 
+// ─── Helpers ────────────────────────────────────────────────────────────────────────────────
+
 function cloneBoard(board: BoardCell[][]): BoardCell[][] {
   return board.map((row) => row.map((cell) => ({ ...cell })))
 }
 
+/** Lignes (ou colonnes) qui ont des tuiles ou sont adjacentes à des lignes qui en ont */
 function getLinesToCheck(board: BoardCell[][], direction: Direction): number[] {
   const lines = new Set<number>()
   for (let lineIdx = 0; lineIdx < BOARD_SIZE; lineIdx++) {
@@ -33,27 +36,59 @@ function getLinesToCheck(board: BoardCell[][], direction: Direction): number[] {
   return [...lines]
 }
 
-function matchRackTiles(rack: TilePiece[], word: string, boardPositions: Set<number>): TilePiece[] | null {
+/**
+ * Associe les tuiles du rack aux positions vides du mot.
+ * Respecte l'ordre d'utilisation : d'abord les vraies tuiles, puis les jokers.
+ */
+function matchRackTiles(
+  rack: TilePiece[],
+  word: string,
+  boardPositions: Set<number>
+): TilePiece[] | null {
   const remaining = [...rack]
   const result: TilePiece[] = []
+
   for (let i = 0; i < word.length; i++) {
     if (boardPositions.has(i)) continue
     const letter = word[i]
+
+    // Cherche d'abord une vraie tuile
     const idx = remaining.findIndex((t) => !t.isBlank && t.letter === letter)
-    if (idx !== -1) { result.push(remaining[idx]); remaining.splice(idx, 1) }
-    else {
+    if (idx !== -1) {
+      result.push(remaining[idx])
+      remaining.splice(idx, 1)
+    } else {
+      // Utilise un joker
       const blankIdx = remaining.findIndex((t) => t.isBlank)
-      if (blankIdx !== -1) { result.push({ ...remaining[blankIdx], blankLetter: letter, points: 0 }); remaining.splice(blankIdx, 1) }
-      else return null
+      if (blankIdx !== -1) {
+        result.push({ ...remaining[blankIdx], blankLetter: letter, points: 0 })
+        remaining.splice(blankIdx, 1)
+      } else {
+        return null
+      }
     }
   }
   return result
 }
 
-function tryPlacement(board: BoardCell[][], rack: TilePiece[], word: string, start: number, lineIdx: number, direction: Direction, isFirstMove: boolean, rulesMode: RulesMode): AIMove | null {
+/**
+ * Tente de placer un mot à une position donnée.
+ * Retourne un AIMove si valide, null sinon.
+ */
+function tryPlacement(
+  board: BoardCell[][],
+  rack: TilePiece[],
+  word: string,
+  start: number,
+  lineIdx: number,
+  direction: Direction,
+  isFirstMove: boolean,
+  rulesMode: RulesMode
+): AIMove | null {
   const wordLen = word.length
   const boardPositions = new Set<number>()
 
+  // 1. Vérifie que les lettres déjà sur le plateau correspondent
   for (let i = 0; i < wordLen; i++) {
     const [r, c] = direction === 'H' ? [lineIdx, start + i] : [start + i, lineIdx]
     const cell = board[r][c]
@@ -64,8 +99,10 @@ function tryPlacement(board: BoardCell[][], rack: TilePiece[], word: string, sta
     }
   }
 
+  // Si toutes les positions sont déjà occupées → rien à poser
   if (boardPositions.size === wordLen) return null
 
+  // 2. Pas de tuile collée avant ou après le mot
   if (start > 0) {
     const [r, c] = direction === 'H' ? [lineIdx, start - 1] : [start - 1, lineIdx]
     if (board[r][c].tile) return null
@@ -75,9 +112,11 @@ function tryPlacement(board: BoardCell[][], rack: TilePiece[], word: string, sta
     if (board[r][c].tile) return null
   }
 
+  // 3. Le rack a-t-il les tuiles nécessaires ?
   const tiles = matchRackTiles(rack, word, boardPositions)
   if (!tiles) return null
 
+  // 4. Construit le plateau temporaire avec les tuiles posées
   const tempBoard = cloneBoard(board)
   const placed: PlacedCell[] = []
   const placements: { row: number; col: number; tile: TilePiece }[] = []
@@ -92,48 +131,67 @@ function tryPlacement(board: BoardCell[][], rack: TilePiece[], word: string, sta
     placements.push({ row: r, col: c, tile })
   }
 
+  // 5. Valide le placement (connexion, centre, etc.)
   const validation = validatePlacement(tempBoard, placed, isFirstMove)
   if (!validation.valid) return null
 
+  // 6. Récupère les mots formés
   const formed = getFormedWords(tempBoard, placed)
   if (formed.length === 0) return null
 
-  // Valide les mots — toujours (Détente et Classique exigent des vrais mots)
+  // 7. Valide les mots (toujours — les deux modes exigent des vrais mots)
   const { valid } = validateWords(formed)
   if (!valid) return null
 
+  // 8. Calcule le score
   const score = calculateScore(formed, placed, rulesMode)
-  if (score === 0) return null
 
   return { placements, score, words: formed.map((f) => f.word) }
 }
 
-export type AIAction = { type: 'move'; move: AIMove } | { type: 'exchange'; count: number } | { type: 'pass' }
+// ─── Échange IA ────────────────────────────────────────────────────────────────────────────
+
+export type AIAction =
+  | { type: 'move'; move: AIMove }
+  | { type: 'exchange'; count: number }
+  | { type: 'pass' }
 
 export function decideAIAction(state: GameState): AIAction {
   const move = findBestAIMove(state)
   if (move) return { type: 'move', move }
+
   const rack = state.players[state.currentPlayer].rack
-  if (state.bag.length >= rack.length) return { type: 'exchange', count: rack.length }
+  if (state.bag.length >= rack.length) {
+    return { type: 'exchange', count: rack.length }
+  }
   return { type: 'pass' }
 }
+
+// ─── Point d'entrée ───────────────────────────────────────────────────────────────────────────
 
 export function findBestAIMove(state: GameState): AIMove | null {
   const { board, players, currentPlayer, isFirstMove, rulesMode, aiDifficulty } = state
   const rack = players[currentPlayer].rack
+
   if (rack.length === 0) return null
 
   const wordList = getAIWordList()
   const allMoves: AIMove[] = []
-  const deadline = Date.now() + 4000
 
+  // 2s par direction pour garantir un équilibre H/V
   for (const direction of ['H', 'V'] as Direction[]) {
+    const deadline = Date.now() + 2000
     const lines = isFirstMove ? [7] : getLinesToCheck(board, direction)
+
     for (const lineIdx of lines) {
+      if (Date.now() > deadline) break
       for (const word of wordList) {
         if (Date.now() > deadline) break
+
         for (let start = 0; start <= BOARD_SIZE - word.length; start++) {
-          const move = tryPlacement(board, rack, word, start, lineIdx, direction, isFirstMove, rulesMode)
+          const move = tryPlacement(
+            board, rack, word, start, lineIdx, direction, isFirstMove, rulesMode
+          )
           if (move) allMoves.push(move)
         }
       }
@@ -141,12 +199,21 @@ export function findBestAIMove(state: GameState): AIMove | null {
   }
 
   if (allMoves.length === 0) return null
+
+  // Trier par score décroissant
   allMoves.sort((a, b) => b.score - a.score)
 
-  if (aiDifficulty === 'hard') return allMoves[0]
+  if (aiDifficulty === 'hard') {
+    // Meilleur coup
+    return allMoves[0]
+  }
+
   if (aiDifficulty === 'normal') {
+    // Tirage aléatoire parmi le top 5
     const pool = allMoves.slice(0, Math.min(5, allMoves.length))
     return pool[Math.floor(Math.random() * pool.length)]
   }
+
+  // easy : coup aléatoire parmi tous les coups valides
   return allMoves[Math.floor(Math.random() * allMoves.length)]
 }
