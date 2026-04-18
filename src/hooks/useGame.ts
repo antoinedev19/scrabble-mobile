@@ -10,6 +10,7 @@ import {
 } from '../game/gameLogic'
 import type { PlacedCell } from '../game/gameLogic'
 import { decideAIAction } from '../game/aiPlayer'
+import { playTilePlaced, playMoveValidated, playInvalidWord } from '../game/sounds'
 
 function createEmptyBoard(): BoardCell[][] {
   return Array.from({ length: BOARD_SIZE }, (_, row) =>
@@ -313,6 +314,7 @@ export function useGame() {
           message: '',
         }
       })
+      playTilePlaced()
       setSelectedRackIdx(null)
       setPendingBlank(null)
     },
@@ -408,11 +410,14 @@ export function useGame() {
 
     const { valid, invalid } = validateWords(formed)
     if (!valid) {
+      playInvalidWord()
       setState((prev) =>
         prev && { ...prev, message: `Mot(s) invalide(s) : ${invalid.join(', ')}` }
       )
       return
     }
+
+    playMoveValidated()
 
     const score = calculateScore(formed, placed, state.rulesMode)
     const wordsStr = formed.map((f) => f.word).join(', ')
