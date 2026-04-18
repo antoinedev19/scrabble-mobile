@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import type { GameState, BoardCell, TilePiece, RulesMode, GameMode, AIDifficulty } from '../game/types'
+import type { GameState, BoardCell, TilePiece, Player, RulesMode, GameMode, AIDifficulty } from '../game/types'
 import { BOARD_PREMIUMS, BOARD_SIZE, RACK_SIZE } from '../game/constants'
 import { createBag, drawTiles, shuffleBag } from '../game/tileBag'
 import {
@@ -52,6 +52,45 @@ function createInitialState(
   }
 }
 
+// ── Calcul des pénalités de fin de partie ────────────────────────────────────
+
+function rackValue(rack: TilePiece[]): number {
+  return rack.reduce((s, t) => s + t.points, 0)
+}
+
+/**
+ * finisherIdx : index du joueur qui a vidé son rack (null = fin par passes)
+ * Règle officielle :
+ *   - Rack vide : le finisher gagne la valeur du rack adverse, l'adversaire la perd
+ *   - 4 passes   : chaque joueur perd la valeur de ses tuiles restantes
+ */
+function computeEndScores(
+  players: [Player, Player],
+  finisherIdx: number | null
+): { players: [Player, Player]; penaltyMsg: string } {
+  if (finisherIdx !== null) {
+    const oppIdx = finisherIdx === 0 ? 1 : 0
+    const bonus = rackValue(players[oppIdx].rack)
+    const updated = players.map((p, i) => ({
+      ...p,
+      score: i === finisherIdx ? p.score + bonus : p.score - rackValue(p.rack),
+    })) as [Player, Player]
+    const penaltyMsg = bonus > 0
+      ? ` ${players[oppIdx].name} -${rackValue(players[oppIdx].rack)} pts (tuiles). ${players[finisherIdx].name} +${bonus} pts.`
+      : ''
+    return { players: updated, penaltyMsg }
+  }
+
+  const msgs: string[] = []
+  const updated = players.map((p) => {
+    const penalty = rackValue(p.rack)
+    if (penalty > 0) msgs.push(`${p.name} -${penalty}`)
+    return { ...p, score: p.score - penalty }
+  }) as [Player, Player]
+  const penaltyMsg = msgs.length > 0 ? ` Pénalités tuiles : ${msgs.join(', ')} pts.` : ''
+  return { players: updated, penaltyMsg }
+}
+
 // ── Applique un coup IA et retourne le nouvel état ────────────────────────────
 
 function applyAITurn(prev: GameState): GameState {
@@ -61,14 +100,23 @@ function applyAITurn(prev: GameState): GameState {
   if (action.type === 'pass') {
     const newPasses = prev.consecutivePasses + 1
     const isGameOver = newPasses >= 4
+    if (isGameOver) {
+      const { players: penalized, penaltyMsg } = computeEndScores(prev.players, null)
+      return {
+        ...prev,
+        players: penalized,
+        currentPlayer: 1,
+        phase: 'gameover',
+        consecutivePasses: newPasses,
+        message: 'Partie terminée après 4 passes.' + penaltyMsg,
+      }
+    }
     return {
       ...prev,
-      currentPlayer: isGameOver ? 1 : 0,
-      phase: isGameOver ? 'gameover' : 'playing',
+      currentPlayer: 0,
+      phase: 'playing',
       consecutivePasses: newPasses,
-      message: isGameOver
-        ? 'Partie terminée après trop de passes.'
-        : `${aiName} passe (pas de coup possible).`,
+      message: `${aiName} passe (pas de coup possible).`,
     }
   }
 
@@ -108,14 +156,21 @@ function applyAITurn(prev: GameState): GameState {
   const isGameOver = newBag.length === 0 && finalRack.length === 0
   const bonusMsg = move.placements.length === 7 ? ' SCRABBLE ! +50 pts' : ''
 
-  const newPlayers = prev.players.map((p, i) =>
+  let finalPlayers = prev.players.map((p, i) =>
     i === 1 ? { ...p, score: p.score + move.score, rack: finalRack } : p
-  ) as GameState['players']
+  ) as [Player, Player]
+  let gameOverMsg = 'Partie terminée !'
+
+  if (isGameOver) {
+    const { players: penalized, penaltyMsg } = computeEndScores(finalPlayers, 1)
+    finalPlayers = penalized
+    gameOverMsg = 'Partie terminée !' + penaltyMsg
+  }
 
   return {
     ...prev,
     board: newBoard,
-    players: newPlayers,
+    players: finalPlayers as GameState['players'],
     bag: newBag,
     currentPlayer: isGameOver ? 1 : 0,
     phase: isGameOver ? 'gameover' : 'playing',
@@ -123,7 +178,7 @@ function applyAITurn(prev: GameState): GameState {
     placedThisTurn: [],
     isFirstMove: false,
     message: isGameOver
-      ? 'Partie terminée !'
+      ? gameOverMsg
       : `${aiName} joue : ${move.words.join(', ')} (+${move.score} pts)${bonusMsg}`,
   }
 }
@@ -374,14 +429,21 @@ export function useGame() {
       const newBoard = prev.board.map((r) =>
         r.map((c) => (c.isNew ? { ...c, isNew: false } : c))
       )
-      const newPlayers = prev.players.map((p, i) =>
+      let updatedPlayers = prev.players.map((p, i) =>
         i === prev.currentPlayer ? { ...p, score: p.score + score, rack: newRack } : p
-      ) as GameState['players']
+      ) as [Player, Player]
+      let gameOverMsg = 'Partie terminée !'
+
+      if (isGameOver) {
+        const { players: penalized, penaltyMsg } = computeEndScores(updatedPlayers, prev.currentPlayer)
+        updatedPlayers = penalized
+        gameOverMsg = 'Partie terminée !' + penaltyMsg
+      }
 
       return {
         ...prev,
         board: newBoard,
-        players: newPlayers,
+        players: updatedPlayers as GameState['players'],
         bag: newBag,
         currentPlayer: isGameOver ? prev.currentPlayer : nextPlayer,
         phase: isGameOver ? 'gameover' : 'playing',
@@ -389,7 +451,7 @@ export function useGame() {
         placedThisTurn: [],
         isFirstMove: false,
         message: isGameOver
-          ? 'Partie terminée !'
+          ? gameOverMsg
           : `${player.name} : ${wordsStr} (+${score} pts)${bonusMsg}`,
       }
     })
@@ -421,21 +483,26 @@ export function useGame() {
         .map((t) => ({ ...t, blankLetter: undefined }))
 
       const newRack = [...prev.players[currentIdx].rack, ...recalledTiles]
-      const newPlayers = prev.players.map((p, i) =>
+      let updatedPlayers = prev.players.map((p, i) =>
         i === currentIdx ? { ...p, rack: newRack } : p
-      ) as GameState['players']
+      ) as [Player, Player]
+      let passMsg = `${prev.players[currentIdx].name} passe son tour.`
+
+      if (wouldGameOver) {
+        const { players: penalized, penaltyMsg } = computeEndScores(updatedPlayers, null)
+        updatedPlayers = penalized
+        passMsg = 'Partie terminée après 4 passes.' + penaltyMsg
+      }
 
       return {
         ...prev,
         board: newBoard,
-        players: newPlayers,
+        players: updatedPlayers as GameState['players'],
         currentPlayer: wouldGameOver ? currentIdx : nextPlayer,
         phase: wouldGameOver ? 'gameover' : 'playing',
         consecutivePasses: newPasses,
         placedThisTurn: [],
-        message: wouldGameOver
-          ? 'Partie terminée après 4 passes consécutives.'
-          : `${prev.players[currentIdx].name} passe son tour.`,
+        message: passMsg,
       }
     })
     setSelectedRackIdx(null)
