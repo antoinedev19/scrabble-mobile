@@ -11,9 +11,43 @@ interface Props {
 export default function GameControls({ onValidate, onPass, onExchange, canValidate, canExchange }: Props) {
   return (
     <div className="flex gap-2 px-3 pb-3">
-      <motion.button whileTap={{ scale: 0.96 }} onClick={onPass} className="flex-1 py-3 rounded-xl bg-[#2a1a0c] border border-[#8B6914]/40 text-[#8B6914] font-semibold text-sm active:brightness-110">Passer</motion.button>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={onExchange} disabled={!canExchange} className={`flex-1 py-3 rounded-xl border font-semibold text-sm transition-opacity ${canExchange ? 'bg-[#2a1a0c] border-[#8B6914]/40 text-[#C8A96E] active:brightness-110' : 'bg-[#2a1a0c] border-[#8B6914]/20 text-[#8B6914]/30 opacity-50'}`}>Échanger</motion.button>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={onValidate} disabled={!canValidate} className={`flex-[2] py-3 rounded-xl font-bold text-sm transition-all ${canValidate ? 'bg-[#C8A96E] text-[#1a0f06] active:bg-[#B89050]' : 'bg-[#C8A96E]/20 text-[#C8A96E]/40 cursor-not-allowed'}`}>Valider ✓</motion.button>
+      <motion.button
+        whileTap={{ scale: 0.96 }}
+        onClick={onPass}
+        className="flex-1 py-3.5 rounded-2xl bg-scrabble-hover border border-scrabble-gold-dark/35 text-scrabble-gold-dark font-medium text-sm font-sans active:brightness-110 transition-all"
+      >
+        Passer
+      </motion.button>
+
+      <motion.button
+        whileTap={{ scale: 0.96 }}
+        onClick={onExchange}
+        disabled={!canExchange}
+        className={`flex-1 py-3.5 rounded-2xl border font-medium text-sm font-sans transition-all ${
+          canExchange
+            ? 'bg-scrabble-hover border-scrabble-gold-dark/35 text-scrabble-cream active:brightness-110'
+            : 'bg-scrabble-hover border-scrabble-gold-dark/15 text-scrabble-gold-dark/30 opacity-40'
+        }`}
+      >
+        Échanger
+      </motion.button>
+
+      <motion.button
+        whileTap={{ scale: 0.96 }}
+        onClick={onValidate}
+        disabled={!canValidate}
+        className={`flex-[2] py-3.5 rounded-2xl font-bold text-sm font-sans tracking-wide transition-all ${
+          canValidate
+            ? 'text-scrabble-brown active:opacity-90'
+            : 'bg-scrabble-gold/15 text-scrabble-gold/35 cursor-not-allowed'
+        }`}
+        style={canValidate ? {
+          background: 'linear-gradient(135deg, #D4B97E 0%, #C8A96E 50%, #B89050 100%)',
+          boxShadow: '0 2px 10px rgba(200,169,110,0.3)',
+        } : undefined}
+      >
+        Valider ✓
+      </motion.button>
     </div>
   )
 }

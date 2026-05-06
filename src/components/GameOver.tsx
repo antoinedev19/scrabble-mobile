@@ -31,7 +31,7 @@ export default function GameOver({ players, endMessage, onPlayAgain, onMenu }: P
         </h2>
         <p className="text-[#C8A96E] mb-4">Fin de la partie</p>
         {endMessage && (
-          <p className="text-[#8B6914] text-xs mb-6 max-w-xs leading-relaxed">{endMessage}</p>
+          <p className="text-[#8B6914] text-sm mb-6 max-w-sm leading-relaxed">{endMessage}</p>
         )}
 
         <div className="bg-[#2a1a0c] rounded-2xl p-5 mb-8 w-full max-w-xs border border-[#8B6914]/30">

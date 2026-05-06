@@ -38,7 +38,7 @@ export default function BlankTileModal({ open, onSelect, onCancel }: Props) {
             <h3 className="text-[#F5E6C8] font-semibold text-center mb-4">
               Joker — Choisis une lettre
             </h3>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-6 gap-2">
               {ALPHABET.map((letter) => (
                 <motion.button
                   key={letter}

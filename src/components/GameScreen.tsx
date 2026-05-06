@@ -69,7 +69,7 @@ export default function GameScreen({
             exit={{ opacity: 0 }}
             className="px-4 py-1.5 text-center"
           >
-            <span className="text-[#C8A96E] text-xs">{state.message}</span>
+            <span className="text-[#C8A96E] text-sm">{state.message}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -94,7 +94,7 @@ export default function GameScreen({
           {hasPlaced && (
             <button
               onClick={onRecallAll}
-              className="text-[#8B6914] text-xs underline"
+              className="text-[#8B6914] text-xs underline px-3 py-2 -mr-3"
             >
               Tout reprendre
             </button>

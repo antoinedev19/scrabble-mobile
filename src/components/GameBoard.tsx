@@ -11,11 +11,11 @@ interface Props {
 }
 
 const PREMIUM_STYLES: Record<string, { bg: string; label: string; short: string }> = {
-  TW: { bg: 'bg-[#C0392B]', label: 'Mot ×3', short: 'M3' },
-  DW: { bg: 'bg-[#E8A0A0]', label: 'Mot ×2', short: 'M2' },
-  CENTER: { bg: 'bg-[#E8A0A0]', label: 'Centre', short: '★' },
-  TL: { bg: 'bg-[#2980B9]', label: 'Let ×3', short: 'L3' },
-  DL: { bg: 'bg-[#85C1E9]', label: 'Let ×2', short: 'L2' },
+  TW:     { bg: 'bg-[#B83228]', label: 'Mot ×3',  short: 'M3' },
+  DW:     { bg: 'bg-[#C87090]', label: 'Mot ×2',  short: 'M2' },
+  CENTER: { bg: 'bg-[#C87090]', label: 'Centre',   short: '★'  },
+  TL:     { bg: 'bg-[#2070A8]', label: 'Let ×3',  short: 'L3' },
+  DL:     { bg: 'bg-[#5899C8]', label: 'Let ×2',  short: 'L2' },
 }
 
 export default function GameBoard({ board, placedThisTurn, selectedRackTile, onCellClick, onTileRecall }: Props) {
@@ -28,10 +28,11 @@ export default function GameBoard({ board, placedThisTurn, selectedRackTile, onC
         style={{
           gridTemplateColumns: 'repeat(15, 1fr)',
           width: 'min(calc(100vw - 8px), 480px)',
-          gap: 1,
-          padding: 3,
-          backgroundColor: '#1a0f06',
-          borderRadius: 8,
+          gap: 1.5,
+          padding: 4,
+          background: 'radial-gradient(ellipse at center, #1f1208 0%, #14100A 100%)',
+          borderRadius: 12,
+          boxShadow: 'inset 0 1px 0 rgba(200,169,110,0.1)',
         }}
       >
         {board.map((row) =>
@@ -43,14 +44,22 @@ export default function GameBoard({ board, placedThisTurn, selectedRackTile, onC
               <div
                 key={`${cell.row}-${cell.col}`}
                 onClick={() => {
-                  if (cell.tile && isNew) onTileRecall(cell.row, cell.col)
-                  else if (!cell.tile && selectedRackTile) onCellClick(cell.row, cell.col)
+                  if (cell.tile && isNew) {
+                    onTileRecall(cell.row, cell.col)
+                  } else if (!cell.tile && selectedRackTile) {
+                    onCellClick(cell.row, cell.col)
+                  }
                 }}
                 className={`
                   relative aspect-square flex items-center justify-center rounded-[2px]
-                  ${cell.tile ? 'bg-transparent' : premium ? premium.bg : 'bg-[#C8A96E]'}
+                  ${cell.tile
+                    ? 'bg-transparent'
+                    : premium
+                      ? premium.bg
+                      : 'bg-[#C8A96E]'
+                  }
                   ${selectedRackTile && !cell.tile ? 'active:brightness-110' : ''}
-                  ${isNew ? 'ring-1 ring-yellow-400 ring-inset' : ''}
+                  ${isNew && !cell.premium ? 'ring-1 ring-yellow-400 ring-inset' : ''}
                 `}
                 style={{ cursor: (cell.tile && isNew) || (!cell.tile && selectedRackTile) ? 'pointer' : 'default' }}
               >
@@ -61,11 +70,16 @@ export default function GameBoard({ board, placedThisTurn, selectedRackTile, onC
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="w-full h-full"
                   >
-                    <TilePiece tile={cell.tile} small selected={isNew} />
+                    <TilePiece
+                      tile={cell.tile}
+                      small
+                      selected={isNew}
+                      bonusType={isNew ? cell.premium : undefined}
+                    />
                   </motion.div>
                 ) : premium ? (
                   <span className="text-white font-bold select-none leading-none"
-                    style={{ fontSize: 'clamp(5px, 1.8vw, 9px)' }}>
+                    style={{ fontSize: 'clamp(7px, 1.8vw, 9px)' }}>
                     {premium.short}
                   </span>
                 ) : null}
